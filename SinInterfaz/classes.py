@@ -2,19 +2,21 @@ import threading
 import time
 import random
 from queue import Queue
-
-t = 15
-n = 1
-
+from threading import Semaphore
 
 class Coche(threading.Thread):
 
-    def __init__(self, nombre):
+    def __init__(self, nombre, surtidor, gasolinera):
         threading.Thread.__init__(self)
         self.nombre = nombre
+        self.surtidor = Surtidor(surtidor, self.nombre)
+        self.gasolinera = gasolinera
 
     def run(self):
-        Surtidor(1, self.nombre).start()
+        self.surtidor.start()
+        self.surtidor.join()
+        self.gasolinera.start()
+        self.gasolinera.join()
 
 class Surtidor(threading.Thread):
 
@@ -22,27 +24,33 @@ class Surtidor(threading.Thread):
         threading.Thread.__init__(self)
         self.nombre = nombre
         self.coche = coche
+        self.estado = "Libre"
+        self.semaforo = Semaphore(1)
 
     def run(self):
         print("Surtidor %s: %s ha llegado" % (self.nombre, self.coche))
+        self.semaforo.acquire()
+        self.estado = "Ocupado"
         time.sleep(random.randint(5, 10))
         print("Surtidor %s: %s ha terminado" % (self.nombre, self.coche))
+        self.estado = "Libre"
+        self.semaforo.release()
         
 class Gasolinera(threading.Thread):
     
-    def __init__(self, nombre, coche):
+    def __init__(self, nombre, coche, cola):
             threading.Thread.__init__(self)
             self.nombre = nombre
             self.coche = coche
-            self.cola = Queue()
+            self.cola = cola
     
     def coche_entra_fila(self):
         self.cola.put(self.coche)
-        print("El conductor del Coche %s se pone en la fila" % self.coche.nombre)
+        print("El conductor del %s se pone en la fila" % self.coche)
 
     def coche_sale_fila(self):
         time.sleep(3)
-        print("El conductor del Coche %s ha pagado" % self.coche.nombre)
+        print("El conductor del %s ha pagado" % self.coche)
         self.cola.get()
 
     def run(self):
@@ -53,13 +61,5 @@ def generar_coche():
     for i in range(50):
         coche = Coche("Coche %s" % i)
         coche.start()
-        time.sleep(15)
+        time.sleep(10)
 
-#def generar_surtidor():
- #   for i in range(n):
-  #      surtidor = Surtidor("Surtidor %s" % i, coche)
-   #     surtidor.start()
-
-if __name__ == "__main__":
-    generar_coche()
-    #generar_surtidor()
